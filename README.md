@@ -50,6 +50,7 @@ Interactive Streamlit app for exploring simple quantitative strategies on COMEX 
 -   Backtest with transaction/slippage costs applied on trades only.
 -   Candlestick + SMA overlay, equity and drawdown charts.
 -   Summary metrics: total return, CAGR, annualized volatility, max drawdown, Sharpe-lite.
+-   Parameter sweep tab for SMA short/long ranges with heatmap visualization.
 
 aimed at education, not investment advice.
 
@@ -58,3 +59,4 @@ aimed at education, not investment advice.
 -   Volume remains as reported (missing values filled with `0`) to avoid fabricating activity.
 -   Strategy signals are generated on close `t` and executed the following day (`t+1`).
 -   Transaction/slippage costs are applied when positions change using turnover = `abs(position.diff())`.
+-   Parameter sweep respects the active date range and re-runs the SMA crossover for each valid short/long pair.

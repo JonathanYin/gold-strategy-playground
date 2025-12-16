@@ -1,13 +1,13 @@
 """Streamlit UI for the Gold Strategy Playground."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
+import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
 from gold_strategy.backtest.engine import run_backtest
+from gold_strategy.backtest.sweep import run_sma_parameter_sweep
 from gold_strategy.data.loaders import build_feature_frame, load_price_data
 from gold_strategy.strategies.sma_crossover import generate_sma_crossover_signals
 
@@ -75,6 +75,20 @@ def plot_drawdown(result) -> go.Figure:
         data=go.Scatter(x=drawdown.index, y=drawdown.values, fill="tozeroy", name="Drawdown"),
     )
     fig.update_layout(margin=dict(l=0, r=0, t=30, b=20), yaxis=dict(tickformat=".0%"))
+    return fig
+
+
+def plot_sweep_heatmap(df: pd.DataFrame, metric: str) -> go.Figure:
+    pivot = df.pivot(index="long_window", columns="short_window", values=metric)
+    if pivot.empty:
+        return go.Figure()
+    fig = px.imshow(
+        pivot,
+        labels=dict(x="Short SMA", y="Long SMA", color=metric.replace("_", " ").title()),
+        aspect="auto",
+        color_continuous_scale="Viridis",
+    )
+    fig.update_layout(margin=dict(l=0, r=0, t=30, b=20))
     return fig
 
 
@@ -153,7 +167,9 @@ metric_cols[2].metric("Volatility", f"{metrics['volatility']:.2%}")
 metric_cols[3].metric("Max drawdown", f"{metrics['max_drawdown']:.2%}")
 metric_cols[4].metric("Sharpe", f"{metrics['sharpe']:.2f}")
 
-chart_tab, equity_tab, drawdown_tab = st.tabs(["Price & SMAs", "Equity curve", "Drawdown"])
+chart_tab, equity_tab, drawdown_tab, sweep_tab = st.tabs(
+    ["Price & SMAs", "Equity curve", "Drawdown", "Parameter sweep"]
+)
 
 with chart_tab:
     short_col = f"sma_{short_window}"
@@ -165,6 +181,68 @@ with equity_tab:
 
 with drawdown_tab:
     st.plotly_chart(plot_drawdown(result), use_container_width=True)
+
+with sweep_tab:
+    st.subheader("SMA parameter sweep")
+    st.write("Explore how different SMA pairs performed over the selected date range.")
+    with st.form("sweep_form"):
+        short_min = st.number_input("Short SMA min", min_value=5, max_value=200, value=10)
+        short_max = st.number_input("Short SMA max", min_value=6, max_value=250, value=30)
+        short_step = st.number_input("Short step", min_value=1, max_value=50, value=5)
+        long_min = st.number_input("Long SMA min", min_value=20, max_value=250, value=40)
+        long_max = st.number_input("Long SMA max", min_value=21, max_value=300, value=120)
+        long_step = st.number_input("Long step", min_value=1, max_value=100, value=10)
+        metric_choice = st.selectbox(
+            "Metric",
+            ["cagr", "total_return", "sharpe", "volatility", "max_drawdown"],
+            index=0,
+            format_func=lambda x: x.replace("_", " ").title(),
+        )
+        sweep_submit = st.form_submit_button("Run sweep")
+
+    def _build_range(min_val: int, max_val: int, step: int) -> list[int]:
+        if max_val < min_val:
+            return []
+        return list(range(min_val, max_val + 1, step))
+
+    if sweep_submit:
+        short_values = _build_range(int(short_min), int(short_max), int(short_step))
+        long_values = _build_range(int(long_min), int(long_max), int(long_step))
+        combos = [(s, l) for s in short_values for l in long_values if s < l]
+        if not combos:
+            st.warning("No valid short/long pairs in the provided ranges.")
+        else:
+            if len(combos) > 400:
+                st.warning(
+                    f"Large grid detected ({len(combos)} combos). This may take a while to compute."
+                )
+            with st.spinner("Running parameter sweep..."):
+                sweep_df = run_sma_parameter_sweep(
+                    filtered_prices,
+                    filtered_features,
+                    short_values,
+                    long_values,
+                    transaction_cost_bps=transaction_cost,
+                    slippage_bps=slippage_cost,
+                    initial_capital=initial_capital,
+                )
+            st.session_state["sweep_results"] = sweep_df
+            st.session_state["sweep_metric"] = metric_choice
+
+    sweep_data = st.session_state.get("sweep_results")
+    if sweep_data is not None:
+        if sweep_data.empty:
+            st.info("Sweep returned no valid results. Try expanding the date range or windows.")
+        else:
+            metric_name = st.session_state.get("sweep_metric", "cagr")
+            precision = 4 if metric_name == "sharpe" else 2
+            st.dataframe(
+                sweep_data[["short_window", "long_window", metric_name]].round(precision),
+                use_container_width=True,
+            )
+            st.plotly_chart(plot_sweep_heatmap(sweep_data, metric_name), use_container_width=True)
+    else:
+        st.info("Submit a sweep to visualize the grid search results.")
 
 st.caption(
     "Results use t+1 execution on daily closes with transaction/slippage costs applied only on trades."
