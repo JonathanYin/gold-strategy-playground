@@ -1,0 +1,41 @@
+[project]
+name = "gold-strategy-playground"
+version = "0.1.0"
+description = "Interactive Streamlit backtester for gold futures strategies"
+authors = [{ name = "Gold Strategy Team" }]
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2,<2.3",
+  "numpy>=1.26,<2.0",
+  "plotly>=5.20,<5.25",
+  "streamlit>=1.32,<1.38",
+  "scipy>=1.12,<1.14"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2,<9.1",
+  "black>=24.4,<25",
+  "ruff==0.5.5"
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "B", "I"]
+ignore = []
+
+[tool.ruff.isort]
+known-first-party = ["gold_strategy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

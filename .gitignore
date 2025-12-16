@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+.streamlit/
+.data-cache/
+data/*.csv
+.data/
+.ipynb_checkpoints/
+.DS_Store
