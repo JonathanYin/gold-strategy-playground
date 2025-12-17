@@ -46,7 +46,7 @@ Interactive Streamlit app for exploring simple quantitative strategies on COMEX 
 
 -   Load OHLCV data locally (no Kaggle API).
 -   Compute SMAs (default 20/50) and daily returns.
--   SMA crossover strategy with proper signal timing (positions applied t+1).
+-   SMA crossover and RSI mean-reversion strategies with proper signal timing (positions applied t+1).
 -   Backtest with transaction/slippage costs applied on trades only.
 -   Candlestick + SMA overlay, equity and drawdown charts.
 -   Summary metrics: total return, CAGR, annualized volatility, max drawdown, Sharpe-lite.
@@ -60,3 +60,4 @@ aimed at education, not investment advice.
 -   Strategy signals are generated on close `t` and executed the following day (`t+1`).
 -   Transaction/slippage costs are applied when positions change using turnover = `abs(position.diff())`.
 -   Parameter sweep respects the active date range and re-runs the SMA crossover for each valid short/long pair.
+-   RSI mean reversion goes long when RSI falls below the oversold threshold and exits when it rises above overbought.
