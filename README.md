@@ -51,6 +51,7 @@ Interactive Streamlit app for exploring simple quantitative strategies on COMEX 
 -   Candlestick + SMA overlay, equity and drawdown charts.
 -   Summary metrics: total return, CAGR, annualized volatility, max drawdown, Sharpe-lite.
 -   Parameter sweep tab for SMA short/long ranges with heatmap visualization.
+-   Walk-forward evaluation tab to compare train/test metrics for a chosen cutoff date.
 
 aimed at education, not investment advice.
 
@@ -61,3 +62,4 @@ aimed at education, not investment advice.
 -   Transaction/slippage costs are applied when positions change using turnover = `abs(position.diff())`.
 -   Parameter sweep respects the active date range and re-runs the SMA crossover for each valid short/long pair.
 -   RSI mean reversion goes long when RSI falls below the oversold threshold and exits when it rises above overbought.
+-   Walk-forward evaluation reuses the chosen strategy parameters on train/test splits to highlight robustness gaps.

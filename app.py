@@ -8,6 +8,7 @@ import streamlit as st
 
 from gold_strategy.backtest.engine import run_backtest
 from gold_strategy.backtest.sweep import run_sma_parameter_sweep
+from gold_strategy.backtest.walk_forward import run_walk_forward
 from gold_strategy.data.loaders import build_feature_frame, load_price_data
 from gold_strategy.strategies.rsi_mean_reversion import generate_rsi_mean_reversion_signals
 from gold_strategy.strategies.sma_crossover import generate_sma_crossover_signals
@@ -204,9 +205,11 @@ metric_cols[4].metric("Sharpe", f"{metrics['sharpe']:.2f}")
 tab_labels = ["Price & Indicators", "Equity curve", "Drawdown"]
 if strategy_key == "sma":
     tab_labels.append("Parameter sweep")
+tab_labels.append("Walk-forward")
 tabs = st.tabs(tab_labels)
 chart_tab, equity_tab, drawdown_tab = tabs[:3]
-sweep_tab = tabs[3] if len(tabs) > 3 else None
+sweep_tab = tabs[3] if strategy_key == "sma" else None
+walk_tab = tabs[-1]
 
 with chart_tab:
     if strategy_key == "sma":
@@ -292,6 +295,44 @@ if sweep_tab:
                 st.plotly_chart(plot_sweep_heatmap(sweep_data, metric_name), use_container_width=True)
         else:
             st.info("Submit a sweep to visualize the grid search results.")
+
+with walk_tab:
+    st.subheader("Walk-forward evaluation")
+    st.write("Split the selected range into train/test windows to gauge robustness.")
+    cutoff_date = st.date_input(
+        "Training period ends",
+        min_value=start_ts.date(),
+        max_value=end_ts.date(),
+        value=start_ts.date(),
+    )
+    cutoff_ts = pd.Timestamp(cutoff_date).tz_localize("UTC")
+    if cutoff_ts <= start_ts or cutoff_ts >= end_ts:
+        st.warning("Cutoff must fall inside the selected date range.")
+    else:
+        wf_params = (
+            {"short_window": short_window, "long_window": long_window}
+            if strategy_key == "sma"
+            else {"window": rsi_window, "oversold": oversold, "overbought": overbought}
+        )
+        try:
+            wf_result = run_walk_forward(
+                filtered_prices,
+                filtered_features,
+                wf_params,
+                train_end=cutoff_ts,
+                strategy=strategy_key,
+                transaction_cost_bps=transaction_cost,
+                slippage_bps=slippage_cost,
+                initial_capital=initial_capital,
+            )
+        except ValueError as exc:
+            st.warning(str(exc))
+        else:
+            metrics_df = pd.DataFrame({"Train": wf_result.train.metrics, "Test": wf_result.test.metrics})
+            st.write("Train vs Test metrics")
+            st.table(metrics_df)
+            st.write("Test equity curve")
+            st.plotly_chart(plot_equity(wf_result.test), use_container_width=True)
 
 st.caption(
     "Results use t+1 execution on daily closes with transaction/slippage costs applied only on trades."
